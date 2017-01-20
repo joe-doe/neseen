@@ -8,6 +8,8 @@ setup(name='neseen',
       description='NEw SEarch ENgine',
       install_requires=[
             'bs4',
+            'pymongo',
+            'elasticsearch'
       ],
       package_data={
           'neseen': ['web/*']
