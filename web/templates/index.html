@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='bower_components/bootstrap/dist/css/bootstrap.min.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='bower_components/bootstrap/dist/css/bootstrap-theme.min.css') }}">
+
+</head>
+<body>
+<div class="container">
+    <table id="myTablel" class="table table-striped">
+        <thead>
+        <tr>
+            <th>index</th>
+            <th>url</th>
+            <th>title</th>
+            <th>description</th>
+        </tr>
+        </thead>
+        <tbody>
+        {% for item in data %}
+        <tr>
+            <td>{{ loop.index }}</td>
+            <td><a href="{{ item.url }}">{{ item.url }}</a></td>
+            <td>{{ item.title }}</td>
+            <td>{{ item.desc }}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+    <script type="text/javascript" src="{{ url_for('static', filename='bower_components/jquery/dist/jquery.min.js') }}"></script>
+    <script type="text/javascript" src="{{ url_for('static', filename='bower_components/bootstrap/dist/js/bootstrap.min.js') }}"></script>
+    <script type="text/javascript" src="https://cdn.datatables.net/1.10.13/js/jquery.dataTables.min.js"></script>
+    <script type="text/javascript" src="https://cdn.datatables.net/1.10.13/js/dataTables.bootstrap.min.js"></script>
+
+    <script>
+    $(document).ready(function(){
+        $('#myTable').DataTable();
+    });
+    </script>
+</body>
+</html>
