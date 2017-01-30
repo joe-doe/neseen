@@ -34,7 +34,7 @@ app = Flask(__name__,
 
 @app.route("/")
 def index():
-    parsed = database.mongodb['url'].find({'parsed': True})
+    parsed = database.mongodb['key_url'].find({'parsed': True})
 
     return render_template("index.html", data=list(parsed))
 

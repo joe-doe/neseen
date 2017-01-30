@@ -1,3 +1,5 @@
 import elasticsearch
 
-es = elasticsearch.Elasticsearch()
+
+def get_es():
+    return elasticsearch.Elasticsearch()

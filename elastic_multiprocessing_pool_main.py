@@ -1,10 +1,11 @@
 import time
 from bs4 import BeautifulSoup
 from urllib.request import urlopen
-from elastic import es
-from multiprocessing import Pool
+from elastic import get_es
+from multiprocessing import Pool, current_process
 
-init_url = 'http://news.google.com'
+init_url = {"protocol": "http",
+            "domain": ["news", "google", "com"]}
 es_index = 'neseen'
 es_type = 'urls'
 
@@ -28,14 +29,16 @@ def get_meta(soup):
 
     return_dict['desc'] = desc
 
+    # print("process: % meta: %", current_process().name, return_dict)
+
     return return_dict
 
 
 def store_meta(soup, doc_id):
-    # print("store meta for: ", url)
 
     meta = get_meta(soup)
 
+    es = get_es()
     es.update(index=es_index,
               doc_type=es_type,
               id=doc_id,
@@ -45,26 +48,43 @@ def store_meta(soup, doc_id):
                       'desc': meta.get('desc')
                   }
               })
+    # print("6. " + current_process().name + " meta ok for: ", meta.get('title'))
 
 
-def store_links_in(soup, doc_id):
+def store_links_in(soup, url):
+    print("7. " + current_process().name + " store links for: ", url)
+
     for link in soup.find_all('a'):
         href = link.get('href')
+        # print("found: ", href)
         if href and href.startswith('http'):
-            domain_list = href.split('/')
+            url_list = href.split('/')
+
             try:
-                domain = domain_list[0] + '//' + domain_list[1] + domain_list[
-                    2]
+                protocol = url_list[0]
+                domain_list = url_list[2].split('.')
             except IndexError:
                 print(href, domain_list)
                 continue
 
+            es = get_es()
             a = es.search(index=es_index,
                           doc_type=es_type,
-                          id=doc_id
+                          body={
+                              'query': {
+                                  'term': {
+                                      'protocol': protocol
+                                  },
+                                  'term': {
+                                      'domain': domain_list
+                                  }
+                              }
+                          },
+                          request_timeout=100
                           )
 
             if a.get('hits').get('hits'):
+                print(current_process().name + " einai mesa: ", domain_list)
                 continue
                 # database.mongodb[mongo_collection].update_one(
                 #     {'_id': a['_id']},
@@ -74,16 +94,18 @@ def store_links_in(soup, doc_id):
                 #     },
                 #     upsert=False)
             else:
-                # print("store url: ", domain)
+                print(current_process().name + "store url: " + domain_list)
+                # print(current_process().name+domain+" not in: list")
                 es.index(index=es_index,
                          doc_type=es_type,
-                         body={'url': domain,
+                         body={'protocol': protocol,
+                               'domain': domain_list,
                                'hits': 1,
                                "parsed": False})
 
 
 def set_entry_parsed(doc_id):
-    # print("set parsed to True for: ", url)
+    es = get_es()
     es.update(index=es_index,
               doc_type=es_type,
               id=doc_id,
@@ -94,21 +116,25 @@ def set_entry_parsed(doc_id):
               })
 
 
-def my_process(url, doc_id):
-    # print("process: ", url)
+def my_process(not_parsed_yet, doc_id):
+    # print("5. " + current_process().name + "making soup for: ", url)
+    url = not_parsed_yet.get("protocol")+"://"+".".join(not_parsed_yet.get("domain"))
     try:
         soup = BeautifulSoup(urlopen(url), 'html.parser')
-    except Exception:
+    except Exception as e:
+        print("WTF: ", url, e)
         return
 
     store_meta(soup, doc_id)
-    store_links_in(soup, doc_id)
+    store_links_in(soup, url)
+    # print("done: ", url)
 
 
 def run_engine():
-    pool = Pool(processes=2)
+    pool = Pool(processes=4)
 
     while True:
+        es = get_es()
         not_parsed = es.search(index=es_index,
                                doc_type=es_type,
                                body={
@@ -117,40 +143,39 @@ def run_engine():
                                            'parsed': False
                                        }
                                    }
-                               }
+                               },
+                               request_timeout=100
                                )
         if not not_parsed:
             continue
         if not not_parsed.get('hits'):
             continue
-        if not not_parsed.get('hits').get('hits'):
+        if not_parsed.get('hits').get('total') < 1:
             continue
+
         next_not_parsed = not_parsed.get('hits').get('hits')[0] \
-            .get('_source').get('url')
+            .get('_source')
         doc_id = not_parsed.get('hits').get('hits')[0].get('_id')
 
         set_entry_parsed(doc_id)
 
         pool.apply_async(my_process, args=(next_not_parsed, doc_id))
-        time.sleep(0.2)
+        time.sleep(0.7)
 
 
-def init(url):
-    soup = BeautifulSoup(urlopen(url), 'html.parser')
-    meta = get_meta(soup)
-
+def init():
+    es = get_es()
     es.index(index=es_index,
              doc_type=es_type,
-             body={'url': url,
+             body={'protocol': init_url.get('protocol'),
+                   'domain': init_url.get('domain'),
                    'hits': 1,
-                   'parsed': False,
-                   'title': meta.get('title'),
-                   'desc': meta.get('desc')
+                   'parsed': False
                    })
 
 
 def kick():
-    init(init_url)
+    init()
     run_engine()
 
 

@@ -85,7 +85,7 @@ def my_process(url):
 
 
 def run_engine(database):
-    pool = Pool(processes=10)
+    pool = Pool(processes=2)
 
     while True:
         not_parsed = database.mongodb[mongo_collection].find_one(
