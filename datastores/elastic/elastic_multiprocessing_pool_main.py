@@ -1,7 +1,7 @@
 import time
 from bs4 import BeautifulSoup
 from urllib.request import urlopen
-from elastic import get_es
+from datastores.elastic.elastic import get_es
 from multiprocessing import Pool, current_process
 
 init_url = {"protocol": "http",
@@ -29,8 +29,6 @@ def get_meta(soup):
 
     return_dict['desc'] = desc
 
-    # print("process: % meta: %", current_process().name, return_dict)
-
     return return_dict
 
 
@@ -48,7 +46,6 @@ def store_meta(soup, doc_id):
                       'desc': meta.get('desc')
                   }
               })
-    # print("6. " + current_process().name + " meta ok for: ", meta.get('title'))
 
 
 def store_links_in(soup, url):
@@ -118,7 +115,8 @@ def set_entry_parsed(doc_id):
 
 def my_process(not_parsed_yet, doc_id):
     # print("5. " + current_process().name + "making soup for: ", url)
-    url = not_parsed_yet.get("protocol")+"://"+".".join(not_parsed_yet.get("domain"))
+    url = not_parsed_yet.get("protocol")+"://"+"."\
+        .join(not_parsed_yet.get("domain"))
     try:
         soup = BeautifulSoup(urlopen(url), 'html.parser')
     except Exception as e:

@@ -21,9 +21,9 @@ class MongoDB(object):
         try:
             self.mongo_client = MongoClient(uri)
             self.mongodb = self.mongo_client[database]
-            # print("Connected successfully to: {}".format(database))
         except errors.ConnectionFailure as e:
             print("Could not connect to database: {}".format(e))
+
 
 def get_new():
     return MongoDB('localhost', 'urls')

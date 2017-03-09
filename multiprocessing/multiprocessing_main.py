@@ -1,7 +1,7 @@
 import time
 from bs4 import BeautifulSoup
 from urllib.request import urlopen
-from db import get_new
+from datastores.mongo.db import get_new
 from multiprocessing import Process
 
 init_url = 'http://news.google.com'
@@ -9,7 +9,6 @@ mongo_collection = 'murl'
 
 
 def store_meta(soup, url, database):
-    # print("store meta for: ", url)
     try:
         title = soup.find('title').text
     except AttributeError:
@@ -55,14 +54,12 @@ def store_links_in(soup, database):
                     },
                     upsert=False)
             else:
-                # print("store url: ", domain)
                 database.mongodb[mongo_collection].insert({'url': domain,
                                                            'hits': 1,
                                                            "parsed": False})
 
 
 def set_entry_parsed(url, database):
-    # print("set parsed to True for: ", url)
     database.mongodb[mongo_collection].update_one(
         {'url': url},
         {"$set": {
@@ -74,11 +71,10 @@ def set_entry_parsed(url, database):
 
 def my_process(url):
     database = get_new()
-    # print("process: ", url)
     try:
         soup = BeautifulSoup(urlopen(url), 'html.parser')
     except Exception:
-        print("WTF")
+        print("Really bad !")
         return
 
     store_meta(soup, url, database)
@@ -94,7 +90,6 @@ def run_engine(database):
             {'parsed': False})
         if not not_parsed:
             continue
-        print("ela")
         set_entry_parsed(not_parsed['url'], database)
 
         p = Process(target=my_process, args=(not_parsed['url'],))
@@ -120,6 +115,7 @@ def clean_up(procs):
                 procs.remove(proc)
                 print(len(procs))
         time.sleep(1)
+
 
 if __name__ == "__main__":
     kick()

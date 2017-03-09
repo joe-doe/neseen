@@ -1,15 +1,14 @@
 import time
 from bs4 import BeautifulSoup
 from urllib.request import urlopen
-from db import get_new
-from multiprocessing import Process, Pool
+from datastores.mongo.db import get_new
+from multiprocessing import Pool
 
 init_url = 'http://news.google.com'
 mongo_collection = 'murl'
 
 
 def store_meta(soup, url, database):
-    # print("store meta for: ", url)
     try:
         title = soup.find('title').text
     except AttributeError:
@@ -55,14 +54,12 @@ def store_links_in(soup, database):
                     },
                     upsert=False)
             else:
-                # print("store url: ", domain)
                 database.mongodb[mongo_collection].insert({'url': domain,
                                                            'hits': 1,
                                                            "parsed": False})
 
 
 def set_entry_parsed(url, database):
-    # print("set parsed to True for: ", url)
     database.mongodb[mongo_collection].update_one(
         {'url': url},
         {"$set": {
@@ -74,7 +71,6 @@ def set_entry_parsed(url, database):
 
 def my_process(url):
     database = get_new()
-    # print("process: ", url)
     try:
         soup = BeautifulSoup(urlopen(url), 'html.parser')
     except Exception:
@@ -104,6 +100,7 @@ def kick():
     my_process(init_url)
 
     run_engine(database)
+
 
 if __name__ == "__main__":
     kick()

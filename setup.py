@@ -7,9 +7,11 @@ setup(name='neseen',
       author='me',
       description='NEw SEarch ENgine',
       install_requires=[
+            'flask',
             'bs4',
             'pymongo',
-            'elasticsearch'
+            'elasticsearch',
+            'aiohttp'
       ],
       package_data={
           'neseen': ['web/*']

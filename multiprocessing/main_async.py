@@ -1,6 +1,5 @@
-import time
 from bs4 import BeautifulSoup
-from db import MongoDB
+from datastores.mongo.db import MongoDB
 import asyncio
 from aiohttp import ClientSession
 

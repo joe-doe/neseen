@@ -1,22 +1,49 @@
 import time
+import signal
 from bs4 import BeautifulSoup
-from urllib.request import urlopen
-from db import get_new
+from urllib.request import Request, urlopen
+from datastores.mongo.db import get_new
 from pymongo import TEXT
 
 init_url = 'http://news.google.com'
 database = get_new()
 mongo_collection = 'full_url'
+go_on = True
+
+
+def signal_handler(signal, frame):
+    """
+    Catch Ctrl-C to gracefully end infinite loop
+
+    :param signal: not used
+    :param frame: not used
+    :return: nothing
+    """
+    global go_on
+    go_on = False
+    print("Drop dead")
+
+
+# register signal
+signal.signal(signal.SIGINT, signal_handler)
 
 
 def store_meta(soup, url):
+    """
+    Store url's html metadata
+
+    :param soup: BeautifulSoup object which contains parsed url
+    :param url: the actual url
+    :return: nothing
+    """
     body = " ".join(soup.stripped_strings)
-    # body = [string for string in soup.stripped_strings]
 
     try:
         title = soup.find('title').text
     except AttributeError:
         title = "no title"
+    except Exception:
+        title = "Something went awfully bad"
 
     meta_desc = soup.findAll('meta', attrs={"name": "description"})
 
@@ -32,19 +59,31 @@ def store_meta(soup, url):
     else:
         keywords = meta_keywords[0].attrs.get('content')
 
-    database.mongodb[mongo_collection].update_one(
-        {'url': url},
-        {'$set': {
-            'title': title,
-            'desc': desc,
-            'keywords': keywords,
-            'body': body
-        }
-        },
-        upsert=False)
+    try:
+        database.mongodb[mongo_collection].update_one(
+            {'url': url},
+            {'$set': {
+                'title': title,
+                'desc': desc,
+                'keywords': keywords,
+                'body': body
+            }
+            },
+            upsert=False)
+    except UnicodeEncodeError as e:
+        print(e)
+        return
 
 
 def store_links_in(soup, url):
+    """
+    Find hrefs in url and store them in db if they don't exist. If they
+    do exist, increase hits.
+
+    :param soup: BeautifulSoup object which contains parsed url
+    :param url: the actual url
+    :return: nothing
+    """
     for link in soup.find_all('a'):
         href = link.get('href')
         if not href:
@@ -72,11 +111,18 @@ def store_links_in(soup, url):
                         upsert=False)
             else:
                 database.mongodb[mongo_collection].insert({'url': domain,
-                                                'hits': 1,
-                                                "parsed": False})
+                                                           'hits': 1,
+                                                           "parsed": False})
 
 
 def set_entry_parsed(entry):
+    """
+    Mark an entry as parsed.
+
+    :param entry: mongodb JSON document
+
+    :return: nothing
+    """
     database.mongodb[mongo_collection].update_one(
         {'_id': entry['_id']},
         {"$set": {
@@ -87,8 +133,20 @@ def set_entry_parsed(entry):
 
 
 def process(url):
+    """
+    Main process function.
+    Make it seems that it's firefox, get BeautifulSoup object and run
+    store_meta and store_links functions.
+
+    :param url: url to process
+    :return: nothing
+    """
+    req = Request(url)
+    req.add_header('user-agent',
+                   'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:51.0) '
+                   'Gecko/20100101 Firefox/51.0')
     try:
-        soup = BeautifulSoup(urlopen(url, timeout=8), 'html.parser')
+        soup = BeautifulSoup(urlopen(req, timeout=8), 'html.parser')
     except Exception:
         return
 
@@ -101,6 +159,11 @@ def process(url):
 
 
 def run_engine():
+    """
+    Find a not processed url from mongodb and process it !
+
+    :return: nothing
+    """
     not_parsed = database.mongodb[mongo_collection].find_one({'parsed': False})
     if not not_parsed:
         return
@@ -109,11 +172,18 @@ def run_engine():
 
 
 def kick():
+    """
+    Run indefinitely until ctrl-c
+    :return: nothing
+    """
     process(init_url)
     database.mongodb[mongo_collection].create_index('parsed')
     database.mongodb[mongo_collection].create_index([('body', TEXT)])
-    while True:
+
+    while go_on:
         run_engine()
         time.sleep(0.1)
 
-kick()
+
+if __name__ == "__main__":
+    kick()
